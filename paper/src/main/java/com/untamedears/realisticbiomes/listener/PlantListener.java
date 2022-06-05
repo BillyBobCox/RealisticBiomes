@@ -31,6 +31,10 @@ public class PlantListener implements Listener {
 
 	public PlantListener(RealisticBiomes plugin, PlantManager plantManager, PlantLogicManager plantLogicManager) {
 		this.plugin = plugin;
+		reload(plantManager, plantLogicManager);
+	}
+
+	public void reload(PlantManager plantManager, PlantLogicManager plantLogicManager) {
 		this.plantManager = plantManager;
 		this.plantLogicManager = plantLogicManager;
 	}

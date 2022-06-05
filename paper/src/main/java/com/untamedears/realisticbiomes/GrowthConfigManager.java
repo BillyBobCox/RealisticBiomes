@@ -19,6 +19,10 @@ public class GrowthConfigManager {
 	private Map<ItemStack, PlantGrowthConfig> plantsByItem;
 
 	public GrowthConfigManager(Set<PlantGrowthConfig> plantConfigs) {
+		reload(plantConfigs);
+	}
+
+	public void reload(Set<PlantGrowthConfig> plantConfigs) {
 		fallbackPlantMap = new EnumMap<>(Material.class);
 		plantsById = new HashMap<>();
 		plantsByItem = new HashMap<>();

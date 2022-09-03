@@ -32,6 +32,36 @@ public class PlantLogicManager {
 		initAdjacentPlantBlocks(growthConfigManager.getAllGrowthConfigs());
 	}
 
+	public void handleCactusPhysics(Block cactusBlock) {
+		Plant plant = plantManager.getPlant(cactusBlock);
+		Block bottom = cactusBlock;
+		int stage = 0;
+
+		if (plant == null) {
+			Block below = cactusBlock.getRelative(BlockFace.DOWN);
+			while (below.getType() == Material.CACTUS) {
+				below = below.getRelative(BlockFace.DOWN);
+				stage++;
+			}
+			bottom = below.getRelative(BlockFace.UP);
+			plant = plantManager.getPlant(bottom);
+		}
+
+		if (plant == null) {
+			return;
+		}
+
+		if (plant.getGrowthConfig() == null
+				|| !(plant.getGrowthConfig().getGrower() instanceof ColumnPlantGrower grower))
+		{
+			plant.resetCreationTime();
+			updateGrowthTime(plant, bottom);
+		} else {
+			long growthTime = plant.getGrowthConfig().getPersistentGrowthTime(bottom, true);
+			updateGrowthTimeOnDestruction(plant, stage, growthTime);
+		}
+	}
+
 	public void handleBlockDestruction(Block block) {
 		if (plantManager == null) {
 			return;
@@ -42,48 +72,85 @@ public class PlantLogicManager {
 			return;
 		}
 
-		handleColumnBlockDestruction(block);
+		if (!handleColumnBlockDestruction(block)) {
+			handleColumnBlockingBlockDestruction(block.getRelative(BlockFace.DOWN));
+			handleColumnBlockingBlockDestruction(block.getRelative(BlockFace.UP));
+		}
+
 		handleFruitBlockDestruction(block);
 	}
 
-	public void handleColumnBlockDestruction(Block block) {
+	private boolean handleColumnBlockDestruction(Block block) {
 		// column plants will always hold the plant object in the bottom most block, so
 		// we need
 		// to update that if we just broke one of the upper blocks of a column plant
 
 		if (columnBlocks == null || !columnBlocks.contains(block.getType()))
-			return;
+			return false;
 
 		Block sourceColumn = VerticalGrower.getRelativeBlock(block ,RBUtils.getGrowthDirection(block.getType()).getOppositeFace());
 		Plant bottomColumnPlant = plantManager.getPlant(sourceColumn);
-		if (bottomColumnPlant == null)
-			return;
+		if (bottomColumnPlant == null) {
+			return false;
+		}
 
 		if (bottomColumnPlant.getGrowthConfig() == null
 				|| !(bottomColumnPlant.getGrowthConfig().getGrower() instanceof ColumnPlantGrower grower)) {
 			// Fallback behaviour
 			bottomColumnPlant.resetCreationTime();
-		} else {
-			Block topColumn = VerticalGrower.getRelativeBlock(block ,RBUtils.getGrowthDirection(block.getType()));
-			int blocksBroken = Math.abs(topColumn.getY() - block.getY()) + 1;
-			long growthTime = bottomColumnPlant.getGrowthConfig().getPersistentGrowthTime(sourceColumn, true);
-			int stage = grower.getStage(bottomColumnPlant);
-			if (stage == grower.getMaxStage()) {
-				// If broken at max growth, set growth time offset from now based on amount of stages/blocks broken
-				int stagesLeft = Math.max(stage - blocksBroken, 0);
-				bottomColumnPlant.setCreationTime(System.currentTimeMillis() - (growthTime * stagesLeft) / stage);
-			} else {
-				// If not broken at max growth, increase creation time based on number of blocks broken
-				long create = bottomColumnPlant.getCreationTime();
-				bottomColumnPlant.setCreationTime(
-						(long) Math.min(System.currentTimeMillis(), create + (growthTime * Math.min(1.0D, (blocksBroken / (double) grower.getMaxStage())))));
-			}
+			updateGrowthTime(bottomColumnPlant, sourceColumn);
+			return true;
 		}
 
-		updateGrowthTime(bottomColumnPlant, sourceColumn);
+		Block topColumn = VerticalGrower.getRelativeBlock(block ,RBUtils.getGrowthDirection(block.getType()));
+		int blocksBroken = Math.abs(topColumn.getY() - block.getY()) + 1;
+		long growthTime = bottomColumnPlant.getGrowthConfig().getPersistentGrowthTime(sourceColumn, true);
+		int oldStage = grower.getStage(bottomColumnPlant);
+		int currentStage = Math.max(oldStage - blocksBroken, 0);
+
+		updateGrowthTimeOnDestruction(bottomColumnPlant, currentStage, growthTime);
+
+		return true;
 	}
 
-	public void handleFruitBlockDestruction(Block block) {
+	private void handleColumnBlockingBlockDestruction(Block block) {
+		if (columnBlocks == null || !columnBlocks.contains(block.getType()))
+			return;
+
+		Block sourceColumn = VerticalGrower.getRelativeBlock(block ,RBUtils.getGrowthDirection(block.getType()).getOppositeFace());
+		Plant bottomColumnPlant = plantManager.getPlant(sourceColumn);
+		if (bottomColumnPlant == null || bottomColumnPlant.getNextUpdate() != Long.MAX_VALUE)
+			return;
+
+		if (bottomColumnPlant.getGrowthConfig() == null
+				|| !(bottomColumnPlant.getGrowthConfig().getGrower() instanceof ColumnPlantGrower grower))
+		{
+			bottomColumnPlant.resetCreationTime();
+			return;
+		}
+
+		long growthTime = bottomColumnPlant.getGrowthConfig().getPersistentGrowthTime(sourceColumn, true);
+		int stage = grower.getStage(bottomColumnPlant);
+
+		updateGrowthTimeOnDestruction(bottomColumnPlant, stage, growthTime);
+	}
+
+	private void updateGrowthTimeOnDestruction(Plant plant, int stage, long growthTime) {
+		ColumnPlantGrower grower = (ColumnPlantGrower) plant.getGrowthConfig().getGrower();
+		long creationTime = System.currentTimeMillis() - growthTime * stage / grower.getMaxStage();
+
+		plant.setCreationTime(System.currentTimeMillis() - growthTime * stage / grower.getMaxStage());
+
+		double incPerStage = grower.getIncrementPerStage();
+		double nextProgressStage = (stage + incPerStage) / grower.getMaxStage();
+		nextProgressStage = Math.min(nextProgressStage, 1.0);
+		long timeFromCreationTillNextStage = (long) (growthTime * nextProgressStage);
+		long nextUpdateTime = creationTime + timeFromCreationTillNextStage;
+
+		plant.setNextGrowthTime(nextUpdateTime);
+	}
+
+	private void handleFruitBlockDestruction(Block block) {
 		if (fruitBlocks == null || !fruitBlocks.contains(block.getType()))
 			return;
 
@@ -244,5 +311,4 @@ public class PlantLogicManager {
 			plant.setNextGrowthTime(nextUpdateTime);
 		}
 	}
-
 }

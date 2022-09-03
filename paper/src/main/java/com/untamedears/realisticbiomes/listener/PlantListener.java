@@ -5,6 +5,7 @@ import com.untamedears.realisticbiomes.PlantManager;
 import com.untamedears.realisticbiomes.RealisticBiomes;
 import com.untamedears.realisticbiomes.growthconfig.PlantGrowthConfig;
 import com.untamedears.realisticbiomes.model.Plant;
+import com.untamedears.realisticbiomes.model.PlantLoadState;
 import com.untamedears.realisticbiomes.utils.RBUtils;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -67,7 +68,17 @@ public class PlantListener implements Listener {
 	}
 
 	private void handleGrowEvent(Cancellable event, Block sourceBlock, Material material) {
-		Plant plant = plantManager.getPlant(RBUtils.getRealPlantBlock(sourceBlock));
+		PlantLoadState state = plantManager.getPlantIfLoaded(RBUtils.getRealPlantBlock(sourceBlock));
+		if (!state.isLoaded) {
+			// RB cannot handle it now and therefore waiting for the next tick
+			// but for now cancel it to prevent vanilla mechanics
+			event.setCancelled(true);
+
+			return;
+		}
+
+		Plant plant = state.plant;
+
 		PlantGrowthConfig growthConfig;
 		if (plant == null) {
 			growthConfig = plugin.getGrowthConfigManager().getGrowthConfigFallback(material);
@@ -107,18 +118,6 @@ public class PlantListener implements Listener {
 		growthConfig.handleAttemptedGrowth(event, sourceBlock);
 	}
 
-	private PlantGrowthConfig getGrowthConfigFallback(Block block) {
-		Plant plant = plantManager.getPlant(block);
-		PlantGrowthConfig growthConfig = null;
-		if (plant != null) {
-			growthConfig = plant.getGrowthConfig();
-		}
-		if (growthConfig == null) {
-			growthConfig = plugin.getGrowthConfigManager().getGrowthConfigFallback(block.getType());
-		}
-		return growthConfig;
-	}
-
 	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
 	public void onBlockPlace(BlockPlaceEvent event) {
 		plugin.getPlantLogicManager().handlePlantCreation(event.getBlock(), event.getItemInHand());
@@ -145,34 +144,24 @@ public class PlantListener implements Listener {
 	 */
 	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
 	public void onBlockSpread(BlockSpreadEvent event) {
-		handleGrowEvent(event, event.getSource(), event.getSource().getType());
-//		Plant plant = plantManager.getPlant(event.getSource());
-//		PlantGrowthConfig growthConfig = getGrowthConfigFallback(event.getBlock());
-//		if (growthConfig != null) {
-//			plant.getGrowthConfig().handleAttemptedGrowth(event, event.getSource());
-//		}
+		handleGrowEvent(event, event.getSource(), event.getNewState().getType());
 	}
 
 	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
 	public void cactusBreak(BlockPhysicsEvent event) {
-		if (event.getBlock().getType() != Material.CACTUS) {
+		// - sourceBlock is affecting the other block
+		//   If it is AIR then this means that the CACTUS block was replaced by AIR
+		// - changedType is the block the was affected
+		//   Must be CACTUS since we handling here CACTUS break event
+		//   Growth time should be recalculated if the CACTUS was broken
+
+		if (event.getChangedType() != Material.CACTUS
+				|| event.getSourceBlock().getType() != Material.AIR
+				|| event.getSourceBlock().getY() <= event.getBlock().getLocation().getY()
+		) {
 			return;
 		}
-		if (event.getChangedType() != Material.AIR) {
-			return;
-		}
-		Plant plant = plantManager.getPlant(event.getBlock());
-		if (plant == null) {
-			// scan downwards
-			Block below = event.getBlock().getRelative(BlockFace.DOWN);
-			while (below.getType() == Material.CACTUS) {
-				below = below.getRelative(BlockFace.DOWN);
-			}
-			Block bottom = below.getRelative(BlockFace.UP);
-			plant = plantManager.getPlant(bottom);
-		}
-		if (plant != null) {
-			plant.resetCreationTime();
-		}
+
+		plugin.getPlantLogicManager().handleCactusPhysics(event.getBlock());
 	}
 }

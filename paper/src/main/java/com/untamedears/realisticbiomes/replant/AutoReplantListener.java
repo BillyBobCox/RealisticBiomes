@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+
+import com.untamedears.realisticbiomes.utils.Constants;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -15,7 +15,6 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Cocoa;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event.Result;
 import org.bukkit.event.EventHandler;
@@ -77,6 +76,11 @@ public class AutoReplantListener implements Listener {
 		if (block == null || event.getAction() != Action.RIGHT_CLICK_BLOCK) {
 			return;
 		}
+
+		ItemStack item = event.getItem();
+		if (item != null && item.getType() == Constants.Stick) // Do not auto-replant when the player just want to get growth info
+			return;
+
 		Player player = event.getPlayer();
 		if (!getToggleAutoReplant(player.getUniqueId())) {
 			return;
@@ -102,7 +106,7 @@ public class AutoReplantListener implements Listener {
 			case WHEAT -> Material.WHEAT_SEEDS;
 			case CARROTS -> Material.CARROT;
 			case POTATOES -> Material.POTATO;
-			case BEETROOTS -> Material.BEETROOT;
+			case BEETROOTS -> Material.BEETROOT_SEEDS;
 			case NETHER_WART -> Material.NETHER_WART;
 			case COCOA -> Material.COCOA_BEANS;
 			default -> null;

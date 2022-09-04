@@ -1,26 +1,62 @@
-import net.civmc.civgradle.CivGradleExtension
-
 plugins {
-	id("net.civmc.civgradle") version "2.+" apply false
+	`java-library`
+	`maven-publish`
+}
+
+gradle.buildFinished {
+	project.buildDir.deleteRecursively()
+}
+
+allprojects {
+	group = rootProject.group
+	version = rootProject.version
+	description = rootProject.description
 }
 
 subprojects {
 	apply(plugin = "java-library")
 	apply(plugin = "maven-publish")
-	apply(plugin = "net.civmc.civgradle")
 
-	configure<CivGradleExtension> {
-		pluginName = project.property("pluginName") as String
+	java {
+		toolchain.languageVersion.set(JavaLanguageVersion.of(17))
+		withJavadocJar()
+		withSourcesJar()
+	}
+
+	tasks {
+		compileJava {
+			options.encoding = Charsets.UTF_8.name()
+			options.release.set(17)
+		}
+		processResources {
+			filteringCharset = Charsets.UTF_8.name()
+			filesMatching("**/plugin.yml") {
+				expand( project.properties )
+			}
+		}
 	}
 
 	repositories {
 		mavenCentral()
-		maven("https://repo.civmc.net/repository/maven-public/")
+		maven("https://nexus.civunion.com/repository/maven-public/")
         maven("https://maven.enginehub.org/repo/")
         maven("https://repo.maven.apache.org/maven2/")
+	}
 
-		flatDir {
-			dirs("../libs")
+	publishing {
+		repositories {
+			maven {
+				url = uri("https://nexus.civunion.com/repository/maven-releases/")
+				credentials {
+					username = System.getenv("REPO_USERNAME")
+					password = System.getenv("REPO_PASSWORD")
+				}
+			}
+		}
+		publications {
+			register<MavenPublication>("main") {
+				from(components["java"])
+			}
 		}
 	}
 }

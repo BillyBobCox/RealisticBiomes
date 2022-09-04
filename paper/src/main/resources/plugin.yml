@@ -1,4 +1,4 @@
-name: ${name}
+name: ${pluginName}
 main: com.untamedears.realisticbiomes.RealisticBiomes
 depend:
 - CivModCore
@@ -15,8 +15,10 @@ authors:
 - pruby
 - Maxopoly
 - BlackXnt
-api-version: 1.18
-description: RealisticBiomes makes farming harder by limiting growth rates of crops and making them only grow well in certain biomes.
+- Diet-Cola
+- Aleksey-Terzi
+description: ${description}
+api-version: ${api_version}
 permissions:
   rb.public:
     default: true

@@ -9,7 +9,7 @@ import com.untamedears.realisticbiomes.listener.PlayerListener;
 import com.untamedears.realisticbiomes.model.Plant;
 import com.untamedears.realisticbiomes.model.RBChunkCache;
 import com.untamedears.realisticbiomes.model.RBDAO;
-import com.untamedears.realisticbiomes.replant.AutoReplantListener;
+import com.untamedears.realisticbiomes.listener.AutoReplantListener;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;

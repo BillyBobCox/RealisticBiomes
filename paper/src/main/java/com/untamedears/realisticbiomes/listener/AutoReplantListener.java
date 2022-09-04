@@ -1,4 +1,4 @@
-package com.untamedears.realisticbiomes.replant;
+package com.untamedears.realisticbiomes.listener;
 
 import com.untamedears.realisticbiomes.RBConfigManager;
 import com.untamedears.realisticbiomes.RealisticBiomes;
